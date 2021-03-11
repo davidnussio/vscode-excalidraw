@@ -1,144 +1,100 @@
 import React, { useEffect, useState, useRef } from "react";
 import Excalidraw from "@excalidraw/excalidraw";
-import InitialData from "./initialData";
 
 import "./styles.css";
 
+const debounce = (func, wait) => {
+  let timeout;
+
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+};
+
 export default function App() {
   const excalidrawRef = useRef(null);
-  const excalidrawWrapperRef = useRef(null);
   const [dimensions, setDimensions] = useState({
     width: undefined,
     height: undefined,
   });
 
-  const [viewModeEnabled, setViewModeEnabled] = useState(false);
-  const [zenModeEnabled, setZenModeEnabled] = useState(false);
-  const [gridModeEnabled, setGridModeEnabled] = useState(false);
-
   useEffect(() => {
     setDimensions({
-      width: excalidrawWrapperRef.current.getBoundingClientRect().width,
-      height: excalidrawWrapperRef.current.getBoundingClientRect().height,
+      width: document.body.getBoundingClientRect().width,
+      height: document.body.getBoundingClientRect().height,
     });
     const onResize = () => {
       setDimensions({
-        width: excalidrawWrapperRef.current.getBoundingClientRect().width,
-        height: excalidrawWrapperRef.current.getBoundingClientRect().height,
+        width: document.body.getBoundingClientRect().width,
+        height: document.body.getBoundingClientRect().height,
       });
     };
 
     window.addEventListener("resize", onResize);
 
     return () => window.removeEventListener("resize", onResize);
-  }, [excalidrawWrapperRef]);
+  }, []);
 
   useEffect(() => {
     window.addEventListener("message", (event) => {
-      console.log(
-        "Excalidraw - Event....",
-        window.location.href
-        // event.source,
-        // event.origin,
-        // event.data
-      );
-      const data = JSON.parse(JSON.parse(event.data).data);
-      setTimeout(() => excalidrawRef.current.updateScene(data), 2000);
+      if (event.data.source === "vscode-excalidraw") {
+        const data = JSON.parse(event.data.data);
+        excalidrawRef.current.updateScene(data);
+      }
     });
-    console.log("########## use effect");
     window.parent.postMessage({ type: "init" }, "*");
   }, []);
 
-  const updateScene = () => {
-    const sceneData = {
-      elements: [
-        {
-          type: "rectangle",
-          version: 141,
-          versionNonce: 361174001,
-          isDeleted: false,
-          id: "oDVXy8D6rom3H1-LLH2-f",
-          fillStyle: "hachure",
-          strokeWidth: 1,
-          strokeStyle: "solid",
-          roughness: 1,
-          opacity: 100,
-          angle: 0,
-          x: 100.50390625,
-          y: 93.67578125,
-          strokeColor: "#c92a2a",
-          backgroundColor: "transparent",
-          width: 186.47265625,
-          height: 141.9765625,
-          seed: 1968410350,
-          groupIds: [],
-        },
-      ],
-      appState: {
-        viewBackgroundColor: "#edf2ff",
-      },
-    };
-    excalidrawRef.current.updateScene(sceneData);
+  window.showSaveFilePicker = (event) => {
+    console.log(excalidrawRef.current);
+    console.log("super show shile pick", JSON.stringify(event));
+    window.parent.postMessage({ type: "save" }, "*");
+    return false;
+  };
+
+  window.showOpenFilePicker = () => {
+    console.log("showOpenFilePicker");
+    return false;
   };
 
   return (
     <div className="App">
-      <h1> Excalidraw Example</h1>
-      <div className="button-wrapper">
-        <button className="update-scene" onClick={updateScene}>
-          Update Scene
-        </button>
-        <button
-          className="reset-scene"
-          onClick={() => {
-            excalidrawRef.current.resetScene();
-          }}
-        >
-          Reset Scene
-        </button>
-        <label>
-          <input
-            type="checkbox"
-            checked={viewModeEnabled}
-            onChange={() => setViewModeEnabled(!viewModeEnabled)}
-          />
-          View mode
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={zenModeEnabled}
-            onChange={() => setZenModeEnabled(!zenModeEnabled)}
-          />
-          Zen mode
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={gridModeEnabled}
-            onChange={() => setGridModeEnabled(!gridModeEnabled)}
-          />
-          Grid mode
-        </label>
-      </div>
-      <div className="excalidraw-wrapper" ref={excalidrawWrapperRef}>
-        <Excalidraw
-          ref={excalidrawRef}
-          width={dimensions.width}
-          height={dimensions.height}
-          initialData={InitialData}
-          onChange={(elements, state) =>
-            console.log("Elements :", elements, "State : ", state)
-          }
-          // onPointerUpdate={(payload) => console.log(payload)}
-          onCollabButtonClick={() =>
-            window.alert("You clicked on collab button")
-          }
-          viewModeEnabled={viewModeEnabled}
-          zenModeEnabled={zenModeEnabled}
-          gridModeEnabled={gridModeEnabled}
-        />
-      </div>
+      <Excalidraw
+        ref={excalidrawRef}
+        width={dimensions.width}
+        height={dimensions.height}
+        onChange={debounce((elements, state) => {
+          window.parent.postMessage(
+            {
+              type: "autosave",
+              data: {
+                type: "excalidraw",
+                version: 2,
+                source: "https://excalidraw.com",
+                elements,
+                appState: {
+                  gridSize: null,
+                  viewBackgroundColor: "#ffffff",
+                },
+              },
+            },
+            "*"
+          );
+        }, 200)}
+        // onPointerUpdate={(payload) => console.log(payload)}
+        // onCollabButtonClick={() =>
+        //   window.alert("You clicked on collab button")
+        // }
+        // viewModeEnabled={viewModeEnabled}
+        // zenModeEnabled={zenModeEnabled}
+        // gridModeEnabled={gridModeEnabled}
+      />
     </div>
   );
 }

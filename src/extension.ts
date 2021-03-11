@@ -45,11 +45,11 @@ function setupWebview(webview: vscode.Webview, port: number) {
   			window.addEventListener('message', event => {
   				console.log('######## MESSAGE ');
   				if (event.source === window.frames[0]) {
-  					console.log(' ------ to vscode ');
+  					console.log(' ------ to vscode ', event.type);
   					api.postMessage(event.data);
   				} else { //if (event.data.source === "vscode-excalidraw") {
-  					console.log(' ------ to iframe ',typeof event.data);
-  					window.frames[0].postMessage(event.data, '*');
+  					console.log(' ------ to iframe ', typeof event.data);
+  					window.frames[0].postMessage(JSON.parse(event.data), 'http://localhost:${port}');
   				}
   			});
   		</script>

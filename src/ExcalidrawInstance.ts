@@ -51,7 +51,7 @@ export class ExcalidrawInstance implements Disposable {
         this.onInitEmitter.fire();
         break;
       case "autosave":
-        const newData = event.data;
+        const newData = JSON.stringify(event.data, null, 2);
         const oldData = this.currentData;
         this.currentData = newData;
         this.onChangeEmitter.fire({
