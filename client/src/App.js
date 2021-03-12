@@ -17,27 +17,36 @@ class FileSystemFileHandleBridge {
   }
 
   close() {
-    console.log(JSON.stringify(this.opts.types[0].accept));
-    console.log(this.data);
-    let reader = new FileReader();
-    reader.readAsDataURL(this.data);
-    reader.onload = () => {
-      this.data = reader.result;
-      if (
-        this.opts.types[0].accept["application/vnd.excalidrawlib+json"] ||
-        this.opts.types[0].accept["image/png"] ||
-        this.opts.types[0].accept["image/svg+xml"]
-      ) {
+    console.log("# close and send data", JSON.stringify(this.opts));
+
+    if (this.opts.types[0].accept["image/png"]) {
+      const reader = new FileReader();
+      reader.readAsDataURL(this.data);
+      reader.onload = () => {
         window.parent.postMessage(
           {
             type: "save",
-            data: this.data,
+            data: reader.result,
             opts: this.opts,
           },
           "*"
         );
-      }
-    };
+      };
+    } else if (
+      this.opts.types[0].accept["application/vnd.excalidrawlib+json"] ||
+      this.opts.types[0].accept["image/svg+xml"]
+    ) {
+      (async () => {
+        window.parent.postMessage(
+          {
+            type: "save",
+            data: await this.data.text(),
+            opts: this.opts,
+          },
+          "*"
+        );
+      })();
+    }
   }
 }
 
