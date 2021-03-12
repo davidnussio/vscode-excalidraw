@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from "react";
 import Excalidraw from "@excalidraw/excalidraw";
 import "./styles.css";
 
+window.confirm = () => true;
+
 class FileSystemFileHandleBridge {
   constructor(opts) {
     this.opts = opts;
