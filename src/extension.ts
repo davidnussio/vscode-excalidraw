@@ -27,6 +27,7 @@ function setupWebview(webview: vscode.Webview, port: number) {
   webview.options = {
     enableScripts: true,
   };
+  webview.postMessage({ type: "dadaada" });
   webview.html = `<!DOCTYPE html><html>
   	<head>
   	<meta charset="UTF-8">
@@ -38,23 +39,25 @@ function setupWebview(webview: vscode.Webview, port: number) {
   	</style>
   	</head>
   	<body>
-  		<iframe src="http://localhost:${port}/index.html?embed=1"></iframe>
+  		<iframe src="http://localhost:${port}/"></iframe>
   		<script>
   			const api = window.VsCodeApi = acquireVsCodeApi();
 
   			window.addEventListener('message', event => {
-  				console.log('######## MESSAGE ');
+  				console.log('# post message proxy ');
   				if (event.source === window.frames[0]) {
-  					console.log(' ------ to vscode ', event.type);
-  					api.postMessage(event.data);
+  					console.log(' ------ to vscode ', event.data.type);
+  					api.postMessage(event.data, "${webview.cspSource}");
   				} else { //if (event.data.source === "vscode-excalidraw") {
-  					console.log(' ------ to iframe ', typeof event.data);
-  					window.frames[0].postMessage(JSON.parse(event.data), 'http://localhost:${port}');
+            const eventData = event.data;
+  					console.log(' ------ to iframe ', eventData.type);
+  					window.frames[0].postMessage(eventData, 'http://localhost:${port}');
   				}
   			});
   		</script>
   	</body>
   	</html>`;
+
   return new ExcalidrawInstance({
     sendMessage: (msg) => webview.postMessage(msg),
     registerMessageHandler: (handler) => webview.onDidReceiveMessage(handler),
@@ -93,6 +96,7 @@ class ExcalidrawEditorProvider
       webviewPanel.webview,
       3000 //(this.server.address() as AddressInfo).port
     );
+
     let isEditorSaving = false;
 
     localDisposables.push(

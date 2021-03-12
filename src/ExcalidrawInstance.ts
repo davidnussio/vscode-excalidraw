@@ -88,13 +88,11 @@ export class ExcalidrawInstance implements Disposable {
           reject,
         });
       }
-      this.messageStream.sendMessage(
-        JSON.stringify({
-          ...action,
-          actionId,
-          source: "vscode-excalidraw",
-        })
-      );
+      this.messageStream.sendMessage({
+        ...action,
+        actionId,
+        source: "vscode-excalidraw",
+      });
 
       if (!expectResponse) {
         resolve({} as ExcalidrawEvent);

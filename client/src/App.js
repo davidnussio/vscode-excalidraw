@@ -3,6 +3,24 @@ import Excalidraw from "@excalidraw/excalidraw";
 
 import "./styles.css";
 
+class FileSystemFileHandleBridge {
+  createWritable() {
+    return this;
+  }
+
+  write() {}
+
+  close() {
+    window.parent.postMessage({ type: "save" }, "*");
+  }
+}
+
+window.showSaveFilePicker = () => {
+  return new FileSystemFileHandleBridge();
+};
+
+window.showOpenFilePicker = undefined;
+
 const debounce = (func, wait) => {
   let timeout;
 
@@ -50,18 +68,6 @@ export default function App() {
     });
     window.parent.postMessage({ type: "init" }, "*");
   }, []);
-
-  window.showSaveFilePicker = (event) => {
-    console.log(excalidrawRef.current);
-    console.log("super show shile pick", JSON.stringify(event));
-    window.parent.postMessage({ type: "save" }, "*");
-    return false;
-  };
-
-  window.showOpenFilePicker = () => {
-    console.log("showOpenFilePicker");
-    return false;
-  };
 
   return (
     <div className="App">
