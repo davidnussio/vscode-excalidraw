@@ -1,4 +1,5 @@
-import { Disposable, EventEmitter } from "vscode";
+import { writeFileSync } from "fs";
+import { window, Disposable, EventEmitter } from "vscode";
 
 export interface MessageStream {
   registerMessageHandler(handler: (message: any) => void): Disposable;
@@ -8,6 +9,7 @@ export interface MessageStream {
 export interface ExcalidrawEvent {
   type: "init" | "autosave" | "save" | "export" | "configure";
   data: string;
+  opts: any;
   actionId?: string;
 }
 
@@ -60,7 +62,34 @@ export class ExcalidrawInstance implements Disposable {
         });
         break;
       case "save":
-        this.onSaveEmitter.fire();
+        if (event.opts) {
+          window
+            .showSaveDialog({
+              saveLabel: `Export as ${event.opts.suggestedName}`,
+            })
+            .then((uri) => {
+              if (!uri) {
+                return;
+              }
+              let modUri = uri.path;
+              if (
+                !modUri.endsWith(`.${event.opts.suggestedName.split(".")[1]}`)
+              ) {
+                modUri += `.${event.opts.suggestedName.split(".")[1]}`;
+              }
+              if (event.opts.suggestedName.split(".")[1] === "png") {
+                writeFileSync(
+                  modUri,
+                  event.data.replace(/^data:image\/\w+;base64,/, ""),
+                  { encoding: "base64" }
+                );
+              } else {
+                writeFileSync(modUri, event.data);
+              }
+            });
+        } else {
+          this.onSaveEmitter.fire();
+        }
         break;
       default:
         // console.log(event);

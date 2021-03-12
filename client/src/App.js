@@ -1,25 +1,72 @@
 import React, { useEffect, useState, useRef } from "react";
 import Excalidraw from "@excalidraw/excalidraw";
-
 import "./styles.css";
 
 class FileSystemFileHandleBridge {
+  constructor(opts) {
+    this.opts = opts;
+    this.data = "";
+  }
+
   createWritable() {
     return this;
   }
 
-  write() {}
+  async write(data) {
+    this.data = data;
+  }
 
   close() {
-    window.parent.postMessage({ type: "save" }, "*");
+    console.log(JSON.stringify(this.opts.types[0].accept));
+    console.log(this.data);
+    let reader = new FileReader();
+    reader.readAsDataURL(this.data);
+    reader.onload = () => {
+      this.data = reader.result;
+      if (
+        this.opts.types[0].accept["application/vnd.excalidrawlib+json"] ||
+        this.opts.types[0].accept["image/png"] ||
+        this.opts.types[0].accept["image/svg+xml"]
+      ) {
+        window.parent.postMessage(
+          {
+            type: "save",
+            data: this.data,
+            opts: this.opts,
+          },
+          "*"
+        );
+      }
+    };
   }
 }
 
-window.showSaveFilePicker = () => {
-  return new FileSystemFileHandleBridge();
+// class FileSystemHandleBridge {
+//   constructor(data) {
+//     this.type = "file";
+//   }
+
+//   createWritable(data) {
+//     return this;
+//   }
+
+//   getFile() {
+//     return new File(["data"], "foo.txt", {
+//       type: "text/plain",
+//     });
+//   }
+// }
+
+window.showSaveFilePicker = (data) => {
+  return new FileSystemFileHandleBridge(data);
 };
 
-window.showOpenFilePicker = undefined;
+window.showOpenFilePicker = async () => {
+  return new Promise((res, rej) => {
+    // setTimeout(() => res([new FileSystemHandleBridge()]), 1000);
+    rej(new Error("Open file not Implemented"));
+  });
+};
 
 const debounce = (func, wait) => {
   let timeout;

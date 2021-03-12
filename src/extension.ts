@@ -46,7 +46,7 @@ function setupWebview(webview: vscode.Webview, port: number) {
   			window.addEventListener('message', event => {
   				console.log('# post message proxy ');
   				if (event.source === window.frames[0]) {
-  					console.log(' ------ to vscode ', event.data.type);
+  					console.log(' ------ to vscode ', event);
   					api.postMessage(event.data, "${webview.cspSource}");
   				} else { //if (event.data.source === "vscode-excalidraw") {
             const eventData = event.data;
