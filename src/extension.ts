@@ -31,11 +31,67 @@ function startServer(): ExcalidrawServer {
   return;
 }
 
-function setupWebview(webview: vscode.Webview, port: number) {
+function getHtmlForWebview(extensionPath: string) {
+  const manifest = require(path.join(
+    extensionPath,
+    "build",
+    "asset-manifest.json"
+  ));
+  const mainScript = manifest.files["main.js"];
+  const mainStyle = manifest.files["main.css"];
+
+  const scriptPathOnDisk = vscode.Uri.file(
+    path.join(extensionPath, "build", mainScript)
+  );
+  const scriptUri = scriptPathOnDisk.with({
+    scheme: "vscode-webview-resource",
+  });
+  const stylePathOnDisk = vscode.Uri.file(
+    path.join(extensionPath, "build", mainStyle)
+  );
+  const styleUri = stylePathOnDisk.with({ scheme: "vscode-webview-resource" });
+
+  return `<!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
+      <meta name="theme-color" content="#000000">
+      <title>React App</title>
+      <link rel="stylesheet" type="text/css" href="${styleUri}">
+     
+      <base href="${vscode.Uri.file(path.join(extensionPath, "build")).with({
+        scheme: "vscode-webview-resource",
+      })}/">
+    </head>
+    <body>
+      <noscript>You need to enable JavaScript to run this app.</noscript>
+      <div id="root"></div>
+      <script>
+      const api = acquireVsCodeApi();
+      
+      window.addEventListener('message', event => {
+  				console.log('# post message proxy ');
+  				if (event.source === window.frames[0]) {
+  					api.postMessage(event.data);
+  				}
+  			});
+  		</script>
+      <script src="${scriptUri}"></script>
+    </body>
+    </html>`;
+}
+
+function setupWebview(
+  webview: vscode.Webview,
+  port: number,
+  extensionPath: string
+) {
   webview.options = {
     enableScripts: true,
   };
-  webview.html = `<!DOCTYPE html><html>
+  if (port) {
+    webview.html = `<!DOCTYPE html><html>
   	<head>
   	<meta charset="UTF-8">
   	<meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline'; worker-src * data: 'unsafe-inline' 'unsafe-eval'; font-src * 'unsafe-inline' 'unsafe-eval';">
@@ -63,6 +119,9 @@ function setupWebview(webview: vscode.Webview, port: number) {
   		</script>
   	</body>
   	</html>`;
+  } else {
+    webview.html = getHtmlForWebview(extensionPath);
+  }
 
   return new ExcalidrawInstance({
     sendMessage: (msg) => webview.postMessage(msg),
@@ -100,7 +159,11 @@ class ExcalidrawEditorProvider
     let initialized = false;
     let firstChange = false;
     const port = await this.serverReady;
-    const excalidrawInstance = setupWebview(webviewPanel.webview, port);
+    const excalidrawInstance = setupWebview(
+      webviewPanel.webview,
+      port,
+      this.context.extensionPath
+    );
 
     let isEditorSaving = false;
 

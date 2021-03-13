@@ -58,7 +58,8 @@
     "keybindings": []
   },
   "scripts": {
-    "build:excalidraw": "cd ../excalidraw && npx react-scripts build && cp -R build ../vscode-excalidraw/",
+    "build:clean": "rm -rf build",
+    "build:excalidraw": "yarn run build:clean && cd client && yarn && yarn build && mv build ../",
     "vscode:prepublish": "yarn run build:excalidraw && yarn run compile",
     "compile": "tsc -p ./",
     "lint": "eslint src --ext ts",

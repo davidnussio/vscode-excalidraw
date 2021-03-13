@@ -6,3 +6,4 @@ build/
 vsc-extension-quickstart.md
 *.log
 package-lock.json
+build

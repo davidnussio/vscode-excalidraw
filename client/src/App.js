@@ -3,6 +3,7 @@ import Excalidraw from "@excalidraw/excalidraw";
 // import Library from "@excalidraw/excalidraw/";
 import "./styles.css";
 
+
 const logObject = (object) => console.log(JSON.stringify(object, null, 2));
 
 window.confirm = () => true;
