@@ -12,22 +12,29 @@ import { AddressInfo } from "net";
 
 import { ExcalidrawInstance } from "./ExcalidrawInstance";
 
+const CREATE_REACT_DEV_SERVER_PORT =
+  process.env.CREATE_REACT_DEV_SERVER_PORT || 3000;
+
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 
-function startServer(): http.Server {
+type ExcalidrawServer = http.Server | undefined;
+
+function startServer(): ExcalidrawServer {
   const root = path.resolve(__dirname, "../build");
-  const serve = serverStatic(root);
-  return http.createServer(function (req, res) {
-    serve(req as any, res as any, finalhandler(req, res));
-  });
+  if (fs.existsSync(root)) {
+    const serve = serverStatic(root);
+    return http.createServer(function (req, res) {
+      serve(req as any, res as any, finalhandler(req, res));
+    });
+  }
+  return;
 }
 
 function setupWebview(webview: vscode.Webview, port: number) {
   webview.options = {
     enableScripts: true,
   };
-  webview.postMessage({ type: "dadaada" });
   webview.html = `<!DOCTYPE html><html>
   	<head>
   	<meta charset="UTF-8">
@@ -38,19 +45,18 @@ function setupWebview(webview: vscode.Webview, port: number) {
   		iframe { height: 100%; width: 100%; padding: 0; margin: 0; border: 0; display: block; }
   	</style>
   	</head>
-  	<body>
+  	<body onLoad="window.frames[0].focus();">
   		<iframe src="http://localhost:${port}/"></iframe>
   		<script>
-  			const api = window.VsCodeApi = acquireVsCodeApi();
+      console.log("@@@@@@@@@@@@@@@@@ http://localhost:${port}/")
+  			const api = acquireVsCodeApi();
 
   			window.addEventListener('message', event => {
   				console.log('# post message proxy ');
   				if (event.source === window.frames[0]) {
-  					console.log(' ------ to vscode ', event.type, "${webview.cspSource}");
   					api.postMessage(event.data);
-  				} else { //if (event.data.source === "vscode-excalidraw") {
+  				} else {
             const eventData = event.data;
-  					console.log(' ------ to iframe ', eventData.type);
   					window.frames[0].postMessage(eventData, 'http://localhost:${port}');
   				}
   			});
@@ -66,8 +72,8 @@ function setupWebview(webview: vscode.Webview, port: number) {
 
 class ExcalidrawEditorProvider
   implements vscode.CustomTextEditorProvider, vscode.Disposable {
-  server: http.Server;
-  serverReady: Promise<void>;
+  server: ExcalidrawServer;
+  serverReady: Promise<number>;
 
   instances: {
     excalidrawInstance: ExcalidrawInstance;
@@ -77,9 +83,11 @@ class ExcalidrawEditorProvider
   constructor(private context: vscode.ExtensionContext) {
     this.server = startServer();
     this.serverReady = new Promise((resolve) => {
-      this.server.listen(undefined, "localhost", () => {
-        resolve();
-      });
+      this.server
+        ? this.server.listen(undefined, "localhost", () => {
+            resolve((this.server?.address() as AddressInfo).port);
+          })
+        : resolve(Number(CREATE_REACT_DEV_SERVER_PORT));
     });
   }
 
@@ -91,11 +99,8 @@ class ExcalidrawEditorProvider
     let localDisposables: vscode.Disposable[] = [];
     let initialized = false;
     let firstChange = false;
-    // await this.serverReady;
-    const excalidrawInstance = setupWebview(
-      webviewPanel.webview,
-      3000 //(this.server.address() as AddressInfo).port
-    );
+    const port = await this.serverReady;
+    const excalidrawInstance = setupWebview(webviewPanel.webview, port);
 
     let isEditorSaving = false;
 
@@ -164,28 +169,6 @@ class ExcalidrawEditorProvider
     });
   }
 
-  broadcastDelete() {
-    this.instances
-      .filter((i) => i.panel.active)
-      .forEach(({ excalidrawInstance }) => {
-        excalidrawInstance.deleteShape();
-      });
-  }
-
-  public async exportTo(
-    format: "png" | "svg" = "png",
-    scale = 1.0
-  ): Promise<string | null> {
-    const instance = this.instances.find((i) => i.panel.active);
-
-    if (!instance) {
-      return null;
-    }
-
-    const { excalidrawInstance } = instance;
-    return await excalidrawInstance.exportTo(format, scale);
-  }
-
   dispose() {
     if (this.server) {
       this.server.close();
@@ -206,77 +189,32 @@ export async function activate(context: vscode.ExtensionContext) {
       { webviewOptions: { retainContextWhenHidden: true } }
     )
   );
-  vscode.commands.registerCommand(
-    "brijeshb42-excalidraw.deleteshape",
-    async () => {
-      provider.broadcastDelete();
-    }
-  );
-  vscode.commands.registerCommand("brijeshb42-excalidraw.export", async () => {
-    const result = await vscode.window.showQuickPick(["png", "svg"], {
-      placeHolder: "Select the export format",
-      ignoreFocusOut: false,
-    });
 
-    if (!result) {
-      return;
-    }
-
-    let scale: string | number | undefined = 1;
-
-    if (result === "png") {
-      scale = await vscode.window.showInputBox({
-        value: "1",
-        prompt: "Input the scale of image (any number)",
-        placeHolder: "1",
-        ignoreFocusOut: false,
-        validateInput(value) {
-          if (!Number.isNaN(parseFloat(value))) {
-            return null;
+  vscode.commands.registerCommand("brijeshb42-excalidraw.import", async () => {
+    vscode.window
+      .showOpenDialog({
+        canSelectMany: false,
+        filters: { "Excalidraw library": ["excalidrawlib"] },
+      })
+      .then((uri) => {
+        if (!uri || !uri.length) {
+          return;
+        }
+        // vscode.window.showInformationMessage(uri[0].path);
+        fs.readFile(uri[0].path, (err, data) => {
+          if (err) {
+            return vscode.window.showErrorMessage(err.message);
           }
-
-          return "error";
-        },
-      });
-    }
-
-    if (!scale) {
-      return;
-    }
-
-    const data = await provider.exportTo(
-      result as "svg" | "png",
-      parseFloat(scale as string)
-    );
-
-    if (!data) {
-      vscode.window.showErrorMessage("Could not export.");
-    } else {
-      vscode.window
-        .showSaveDialog({
-          saveLabel: `Export as ${result}`,
-        })
-        .then((uri) => {
-          if (!uri) {
-            return;
-          }
-
-          let modUri = uri.path;
-          if (!modUri.endsWith(`.${result}`)) {
-            modUri += `.${result}`;
-          }
-
-          if (result === "png") {
-            fs.writeFileSync(
-              modUri,
-              data.replace(/^data:image\/\w+;base64,/, ""),
-              { encoding: "base64" }
-            );
-          } else {
-            fs.writeFileSync(modUri, data);
-          }
+          // provider.instances.forEach((instance) => {
+          provider.instances.length &&
+            provider.instances[0].excalidrawInstance.messageStream.sendMessage({
+              type: "import:lib",
+              source: "vscode-excalidraw",
+              data: data.toString(),
+            });
+          // });
         });
-    }
+      });
   });
   context.subscriptions.push(provider);
 }

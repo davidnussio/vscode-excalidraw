@@ -1,5 +1,5 @@
 import { writeFileSync } from "fs";
-import { window, Disposable, EventEmitter } from "vscode";
+import { window, Disposable, EventEmitter, commands } from "vscode";
 
 export interface MessageStream {
   registerMessageHandler(handler: (message: any) => void): Disposable;
@@ -7,16 +7,20 @@ export interface MessageStream {
 }
 
 export interface ExcalidrawEvent {
-  type: "init" | "autosave" | "save" | "export" | "configure";
+  type:
+    | "init"
+    | "update-vscode-document"
+    | "save"
+    | "save-dialog"
+    | "execute-command";
   data: string;
   opts: any;
   actionId?: string;
 }
 
 export interface ExcalidrawAction {
-  type: "load" | "save" | "deleteShape" | "export";
+  type: "load" | "save";
   data?: string;
-  autosave?: 1 | 0;
   scale?: number;
 }
 
@@ -52,7 +56,7 @@ export class ExcalidrawInstance implements Disposable {
       case "init":
         this.onInitEmitter.fire();
         break;
-      case "autosave":
+      case "update-vscode-document":
         const newData = JSON.stringify(event.data, null, 2);
         const oldData = this.currentData;
         this.currentData = newData;
@@ -61,35 +65,41 @@ export class ExcalidrawInstance implements Disposable {
           oldData,
         });
         break;
-      case "save":
-        if (event.opts) {
-          window
-            .showSaveDialog({
-              saveLabel: `Export as ${event.opts.suggestedName}`,
-            })
-            .then((uri) => {
-              if (!uri) {
-                return;
-              }
-              let modUri = uri.path;
-              if (
-                !modUri.endsWith(`.${event.opts.suggestedName.split(".")[1]}`)
-              ) {
-                modUri += `.${event.opts.suggestedName.split(".")[1]}`;
-              }
-              if (event.opts.suggestedName.split(".")[1] === "png") {
-                writeFileSync(
-                  modUri,
-                  event.data.replace(/^data:image\/\w+;base64,/, ""),
-                  { encoding: "base64" }
-                );
-              } else {
-                writeFileSync(modUri, event.data);
-              }
-            });
-        } else {
-          this.onSaveEmitter.fire();
+
+      case "execute-command":
+        await commands.executeCommand("brijeshb42-excalidraw.import");
+        break;
+      case "save-dialog":
+        if (!event.opts) {
+          window.showErrorMessage("File options are missing");
         }
+        window
+          .showSaveDialog({
+            saveLabel: `Export as ${event.opts.suggestedName}`,
+          })
+          .then((uri) => {
+            if (!uri) {
+              return;
+            }
+            let modUri = uri.path;
+            if (
+              !modUri.endsWith(`.${event.opts.suggestedName.split(".")[1]}`)
+            ) {
+              modUri += `.${event.opts.suggestedName.split(".")[1]}`;
+            }
+            if (event.opts.suggestedName.split(".")[1] === "png") {
+              writeFileSync(
+                modUri,
+                event.data.replace(/^data:image\/\w+;base64,/, ""),
+                { encoding: "base64" }
+              );
+            } else {
+              writeFileSync(modUri, event.data);
+            }
+          });
+        break;
+      case "save":
+        this.onSaveEmitter.fire();
         break;
       default:
         // console.log(event);
@@ -134,41 +144,7 @@ export class ExcalidrawInstance implements Disposable {
     this.sendAction({
       type: "load",
       data,
-      autosave: 1,
     });
-  }
-
-  public async getData(type: "raw" | "svg" | "png" = "raw") {
-    const message = await this.sendAction(
-      {
-        type: "save",
-        data: type,
-      },
-      true
-    );
-    return message.data;
-  }
-
-  public async deleteShape() {
-    await this.sendAction(
-      {
-        type: "deleteShape",
-      },
-      true
-    );
-  }
-
-  public async exportTo(format: string, scale = 1) {
-    const res = await this.sendAction(
-      {
-        type: "save",
-        data: format,
-        scale,
-      },
-      true
-    );
-
-    return res.data;
   }
 
   dispose() {

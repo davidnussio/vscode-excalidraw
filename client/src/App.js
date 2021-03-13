@@ -1,10 +1,13 @@
 import React, { useEffect, useState, useRef } from "react";
 import Excalidraw from "@excalidraw/excalidraw";
+// import Library from "@excalidraw/excalidraw/";
 import "./styles.css";
+
+const logObject = (object) => console.log(JSON.stringify(object, null, 2));
 
 window.confirm = () => true;
 
-class FileSystemFileHandleBridge {
+class FileSystemFileHandleVsCodeBridge {
   constructor(opts) {
     this.opts = opts;
     this.data = "";
@@ -14,20 +17,18 @@ class FileSystemFileHandleBridge {
     return this;
   }
 
-  async write(data) {
+  write(data) {
     this.data = data;
   }
 
   close() {
-    console.log("# close and send data", JSON.stringify(this.opts));
-
     if (this.opts.types[0].accept["image/png"]) {
       const reader = new FileReader();
       reader.readAsDataURL(this.data);
       reader.onload = () => {
         window.parent.postMessage(
           {
-            type: "save",
+            type: "save-dialog",
             data: reader.result,
             opts: this.opts,
           },
@@ -41,7 +42,7 @@ class FileSystemFileHandleBridge {
       (async () => {
         window.parent.postMessage(
           {
-            type: "save",
+            type: "save-dialog",
             data: await this.data.text(),
             opts: this.opts,
           },
@@ -52,7 +53,7 @@ class FileSystemFileHandleBridge {
   }
 }
 
-// class FileSystemHandleBridge {
+// class FileSystemHandleVsCodeBridge {
 //   constructor(data) {
 //     this.type = "file";
 //   }
@@ -69,14 +70,7 @@ class FileSystemFileHandleBridge {
 // }
 
 window.showSaveFilePicker = (data) => {
-  return new FileSystemFileHandleBridge(data);
-};
-
-window.showOpenFilePicker = async () => {
-  return new Promise((res, rej) => {
-    // setTimeout(() => res([new FileSystemHandleBridge()]), 1000);
-    rej(new Error("Open file not Implemented"));
-  });
+  return new FileSystemFileHandleVsCodeBridge(data);
 };
 
 const debounce = (func, wait) => {
@@ -100,6 +94,23 @@ export default function App() {
     height: undefined,
   });
 
+  window.showOpenFilePicker = async (data) => {
+    logObject(data);
+    return new Promise((res, rej) => {
+      // setTimeout(() => res([new FileSystemHandleVsCodeBridge()]), 1000);
+      window.parent.postMessage({ type: "execute-command" }, "*");
+      setTimeout(
+        () =>
+          rej(
+            new Error(
+              "It's not fully supported, after loading library you have to reopen the application"
+            )
+          ),
+        300
+      );
+    });
+  };
+
   useEffect(() => {
     setDimensions({
       width: document.body.getBoundingClientRect().width,
@@ -119,13 +130,27 @@ export default function App() {
 
   useEffect(() => {
     window.addEventListener("message", (event) => {
-      if (event.data.source === "vscode-excalidraw") {
+      if (event.data.source !== "vscode-excalidraw") {
+        return;
+      }
+      if (event.data.type === "import:lib") {
+        const library = JSON.parse(localStorage.getItem("excalidraw-library"));
+        const data = JSON.parse(event.data.data);
+        localStorage.setItem(
+          "excalidraw-library",
+          JSON.stringify(
+            (Array.isArray(library) ? library : []).concat(data.library)
+          )
+        );
+      } else {
         const data = JSON.parse(event.data.data);
         excalidrawRef.current.updateScene(data);
       }
     });
     window.parent.postMessage({ type: "init" }, "*");
   }, []);
+
+  console.log(excalidrawRef.current);
 
   return (
     <div className="App">
@@ -134,18 +159,18 @@ export default function App() {
         width={dimensions.width}
         height={dimensions.height}
         onChange={debounce((elements, state) => {
+          if (!state) {
+            return;
+          }
           window.parent.postMessage(
             {
-              type: "autosave",
+              type: "update-vscode-document",
               data: {
                 type: "excalidraw",
                 version: 2,
                 source: "https://excalidraw.com",
                 elements,
-                appState: {
-                  gridSize: null,
-                  viewBackgroundColor: "#ffffff",
-                },
+                appState: state,
               },
             },
             "*"

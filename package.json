@@ -24,7 +24,7 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "brijeshb42-excalidraw.export",
+          "command": "brijeshb42-excalidraw.import",
           "when": "resourceExtname == .excalidraw"
         },
         {
@@ -39,8 +39,8 @@
         "title": "Delete currently selected shape"
       },
       {
-        "command": "brijeshb42-excalidraw.export",
-        "title": "Export file as png/svg"
+        "command": "brijeshb42-excalidraw.import",
+        "title": "Import excalidraw lib"
       }
     ],
     "customEditors": [
