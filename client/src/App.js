@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useRef } from "react";
 import Excalidraw from "@excalidraw/excalidraw";
+import React, { useEffect, useRef, useState } from "react";
 // import Library from "@excalidraw/excalidraw/";
 import "./styles.css";
-
 
 const logObject = (object) => console.log(JSON.stringify(object, null, 2));
 
@@ -130,7 +129,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    window.addEventListener("message", (event) => {
+    const messageCallback = (event) => {
       if (event.data.source !== "vscode-excalidraw") {
         return;
       }
@@ -147,11 +146,14 @@ export default function App() {
         const data = JSON.parse(event.data.data);
         excalidrawRef.current.updateScene(data);
       }
-    });
-    window.parent.postMessage({ type: "init" }, "*");
-  }, []);
+    };
 
-  console.log(excalidrawRef.current);
+    window.addEventListener("message", messageCallback);
+
+    window.parent.postMessage({ type: "init" }, "*");
+
+    return () => window.removeEventListener("message", messageCallback);
+  }, []);
 
   return (
     <div className="App">
